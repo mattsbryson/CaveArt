@@ -1,3 +1,6 @@
+#ifndef PIXELS_H
+#define PIXELS_H
+
 #define RED_3_3_2 0xE0      //use with & char
 #define GRN_3_3_2 0x1C
 #define BLU_3_3_2 0x03
@@ -37,10 +40,19 @@ enum class PIXEL_FORMAT : char {
 
 template<unsigned bit_depth, PIXEL_FORMAT fmt> struct Pixel {};
 
+template<> struct Pixel<8, PIXEL_FORMAT::PALETTE>;
+template<> struct Pixel<8, PIXEL_FORMAT::RGB>;
+template<> struct Pixel<16, PIXEL_FORMAT::RGB>;
+template<> struct Pixel<16, PIXEL_FORMAT::RGBA>;
+template<> struct Pixel<24, PIXEL_FORMAT::RGB>;
+template<> struct Pixel<32, PIXEL_FORMAT::RGB>;
+template<> struct Pixel<32, PIXEL_FORMAT::RGBA>;
+template<> struct Pixel<64, PIXEL_FORMAT::RGBA>;
+
 template<> struct Pixel<8, PIXEL_FORMAT::RGB> {
     unsigned char color;
     Pixel(unsigned char red, unsigned char green, unsigned char blue) {
-        color = 0xFF & (((red << 5) & RED_3_3_2) & ((green << 2) & GRN_3_3_2) & (blue & BLU_3_3_2));
+        color = (0xFF & ((red << 5) & RED_3_3_2) & ((green << 2) & GRN_3_3_2) & (blue & BLU_3_3_2));
     }
     Pixel(unsigned char clr) { color = clr; }
 
@@ -57,26 +69,12 @@ template<> struct Pixel<8, PIXEL_FORMAT::RGB> {
         }
     }
     */
-
-    Pixel<16, PIXEL_FORMAT::RGB> convert_to_rgb16() {
-        unsigned char red, grn, blu;
-        red = ((color & RED_3_3_2) >> 5);
-        grn = ((color & GRN_3_3_2) >> 2);
-        blu = (color & BLU_3_3_2);
-
-        red = ((red/7) * 31);   //5
-        grn = ((grn/7) * 63);   //6
-        blu = ((blu/3) * 31);   //5
-
-        Pixel<16, PIXEL_FORMAT::RGB> _16rgb(red, grn, blu);
-        return _16rgb;
-    }
 };
 
 template<> struct Pixel<16, PIXEL_FORMAT::RGB> {
     unsigned short color;
     Pixel(unsigned char red, unsigned char green, unsigned char blue) {
-        color = (0xFFFF & (((red << 11) & RED_5_6_5) & ((green << 5) & GRN_5_6_5) & (blue & BLU_5_6_5)));
+        color = (0xFFFF & ((red << 11) & RED_5_6_5) & ((green << 5) & GRN_5_6_5) & (blue & BLU_5_6_5));
     }
     Pixel(short clr) { color = clr; }
 };
@@ -84,7 +82,7 @@ template<> struct Pixel<16, PIXEL_FORMAT::RGB> {
 template<> struct Pixel<16, PIXEL_FORMAT::RGBA> {
     unsigned short color;
     Pixel(unsigned char red, unsigned char green, unsigned char blue, unsigned char alpha = 0) {
-        color = (0xFFFF & (((red << 12) & RED_4_4_4_4) & ((green << 8) & GRN_4_4_4_4) & ((blue << 4) & BLU_4_4_4_4) & (alpha & ALP_4_4_4_4)));
+        color = (0xFFFF & ((red << 12) & RED_4_4_4_4) & ((green << 8) & GRN_4_4_4_4) & ((blue << 4) & BLU_4_4_4_4) & (alpha & ALP_4_4_4_4));
     }
 };
 
@@ -112,7 +110,7 @@ template<> struct Pixel<32, PIXEL_FORMAT::RGBA> {   //True color... BUT WITH TRA
     Pixel() { color = 0x00000000; }
 
     Pixel(unsigned char red, unsigned char green, unsigned char blue, unsigned char alpha = 0) {
-        color = (0xFFFFFFFF & (((red << 24) & RED_8_8_8_8) & ((green << 16) & GRN_8_8_8_8) & ((blue << 8) & BLU_8_8_8_8) & (alpha & ALP_8_8_8_8)));
+        color = (0xFFFFFFFF & ((red << 24) & RED_8_8_8_8) & ((green << 16) & GRN_8_8_8_8) & ((blue << 8) & BLU_8_8_8_8) & (alpha & ALP_8_8_8_8));
     }
 
     Pixel(unsigned long clr) {
@@ -125,24 +123,21 @@ template<> struct Pixel<32, PIXEL_FORMAT::RGBA> {   //True color... BUT WITH TRA
 };
 
 struct pixel_palette {
-    typedef Pixel<32, PIXEL_FORMAT::RGBA> _32rgba_pixl;
-    _32rgba_pixl* pixels;
-    pixel_palette(unsigned char red = 0, unsigned char grn = 0, unsigned char blu = 0, unsigned char alp = 0, unsigned char incr = 4, unsigned int pal_size = 256) {
+    typedef Pixel<24, PIXEL_FORMAT::RGB> _24rgb_pixl;
+    _24rgb_pixl* pixels;
+    pixel_palette(unsigned char red = 0, unsigned char grn = 0, unsigned char blu = 0, unsigned char incr = 4, unsigned int pal_size = 256) {
 
-        pixels = new _32rgba_pixl[pal_size];
+        pixels = new _24rgb_pixl[pal_size];
         unsigned int i = 0;
 
         while(i < pal_size) {
-            pixels[i] = _32rgba_pixl(red, grn, blu, alp);
-            if((red <= grn) && (red <= blu) && (red <= alp)) {
+            pixels[i] = _24rgb_pixl(red, grn, blu);
+            if((red <= grn) && (red <= blu)) {
                 red += incr;
-            } else if((grn < red) && (grn <= blu) && (grn <= alp)) {
+            } else if((grn < red) && (grn <= blu)) {
                 grn += incr;
-            } else if((blu < red) && (blu < grn) && (blu <= alp)) {
-                blu += incr;
             } else {
-                alp += incr;
-            }
+                blu += incr;
             i++;
         }
     }
@@ -160,3 +155,5 @@ template<> struct Pixel<8, PIXEL_FORMAT::PALETTE> {
     }
 
 };
+
+#endif // PIXELS_H

@@ -1,4 +1,4 @@
-/*  FreeArt is a platform-independent image editing tool. */
+/*  CaveArt is a platform-independent image editing tool. */
 /*  It makes use of GLFW, FreeImage, Boost, and open      */
 /*  source libraries that use the GPL license or          */
 /*  otherwise are open source and available for commercial*/
