@@ -1,15 +1,11 @@
 #ifndef INTERPRETER_H_INCLUDED
 #define INTERPRETER_H_INCLUDED
 
-#include<cstddef>
-#include<cstdint>
-#include<climits>
-
 #include<queue>
 #include<list>
 #include<unordered_map>
 
-#include "Types/CharcoalTypes.h"
+#include "Types\CharcoalTypes.h"
 
 /*
     For functions, I peeked into the Python source code
@@ -29,6 +25,11 @@ struct _chclCommand {
 class Charcoal_Interpreter {        //Charcoal, get it? From CaveArt? Eh? Eh?
     std::list<_chclType> types;
     std::queue<_chclCommand> commands;
+    VarTable globals;
+
+    std::vector<unsigned int> getFunctionDeclLines();
+    void include(std::string filename);
+
     Charcoal_Interpreter();
 public:
     ~Charcoal_Interpreter();
