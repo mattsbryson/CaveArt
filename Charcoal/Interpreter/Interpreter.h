@@ -1,9 +1,9 @@
 #ifndef INTERPRETER_H_INCLUDED
 #define INTERPRETER_H_INCLUDED
 
-#include<queue>
-#include<list>
-#include<unordered_map>
+#include <queue>
+#include <list>
+#include <unordered_map>
 
 #include "Types\CharcoalTypes.h"
 
@@ -17,13 +17,13 @@
 */
 
 struct _chclCommand {
-    _chclType _retType;
+    _chclType* _retType;
     VarTable locals;
-    std::string name;
+    std::vector<std::string> code;
 };
 
 class Charcoal_Interpreter {        //Charcoal, get it? From CaveArt? Eh? Eh?
-    std::list<_chclType> types;
+    std::list<_chclType*> types;
     std::queue<_chclCommand> commands;
     VarTable globals;
 

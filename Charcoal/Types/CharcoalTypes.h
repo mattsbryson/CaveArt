@@ -1,12 +1,15 @@
 #ifndef CHARCOALTYPES_H_INCLUDED
 #define CHARCOALTYPES_H_INCLUDED
 
-#include<cstddef>
-#include<cstdint>
-#include<climits>
+#include <cstddef>
+#include <cstdint>
+#include <cmath>
+#include <climits>
+#include <typeinfo>
 
-#include<string>
-#include<vector>
+#include <string>
+#include <vector>
+
 
 /*
     The following code is inspired by Vijay Matthew's post
@@ -18,20 +21,153 @@
     This is meant to be a "header-only library".
 */
 
+struct _chclType;
+struct Bool;
+struct Void;
+struct Int;
+struct Float;
+struct Struct;
+
 struct _chclType {
     typedef std::vector<_chclType*> typeVec;  //allows for interations between multiple different types
 
     virtual ~_chclType() {};  //defined for each type
 
-    virtual operator std::string() const = delete;           //instead of a toString method, a std::string casting operator
+    virtual operator std::string() const = 0; //instead of a toString method, a std::string casting operator
 
-    virtual bool operator ==(const _chclType& other) = delete; //regular equality operators
-    virtual bool operator !=(const _chclType& other) = delete;
+    virtual bool operator ==(const _chclType* other) = 0; //regular equality operators
+    virtual bool operator !=(const _chclType* other) = 0;
 
-    virtual _chclType& invoke_op(const std::string& oper, const typeVec& args) = delete;
+    virtual std::string type() const = 0;
+
+    virtual _chclType* invoke_op(const std::string& oper, const typeVec& args) = 0;
 };
 
+struct Bool : _chclType {
+private:
+    _chclType* _ret = nullptr;
+public:
+    bool tf;
+
+    virtual operator std::string() const {
+        if(tf) {
+            return "true";
+        } else {
+            return "false";
+        }
+    }
+
+    virtual std::string type() const {
+        return "Bool";
+    }
+
+    virtual bool operator==(const _chclType* other) {
+        if(other->type() == this->type()) {
+            try {
+                const Bool* temp = dynamic_cast<const Bool*> (other);
+                if(temp->tf == this->tf) {
+                    return true;
+                } else {
+                    return false;
+                }
+            } catch(std::bad_cast ex) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    virtual bool operator!=(const _chclType* other) {
+        return !(*this == other);
+    }
+
+    virtual bool operator!() {
+        return !tf;
+    }
+
+    Bool(bool b) : tf(b) {}
+    ~Bool() {
+        if(_ret != nullptr) {
+            delete _ret;
+        }
+    }
+
+    Bool& operator=(bool b) {
+        tf = b;
+        return (Bool&)(*this);
+    }
+
+    explicit operator bool() {
+        return tf;
+    }
+
+    virtual _chclType* invoke_op(const std::string& oper, const typeVec& args) {
+        if((oper == "==") || (oper == "equal to")) {
+            _ret = new Bool((*this == args[1]));
+            return _ret;
+        } else if((oper == "!=") || (oper == "not equal to")) {
+            _ret = new Bool((*this != args[1]));
+            return _ret;
+        } else if((oper == "!") || (oper == "not")){
+            _ret = new Bool(!(*this));
+            return _ret;
+        } else if((oper == "&&") || (oper == "and")){
+            _ret = new Bool((tf && args[1]));
+            return _ret;
+        } else if((oper == "||") || (oper == "or")) {
+            _ret = new Bool((tf || args[1]));
+            return _ret;
+        } else {
+            return _ret;
+        }
+    }
+};
+
+struct Void : _chclType {
+private:
+    _chclType* _ret = nullptr;
+public:
+
+    virtual operator std::string() const {
+        return std::string("VOID");
+    }
+
+    virtual std::string type() const {
+        return "VOID";
+    }
+
+    virtual bool operator==(const _chclType& other) {
+        if(other.type() == this->type()) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    virtual bool operator!=(const _chclType& other) {
+        return !(*this == other);
+    }
+
+    virtual _chclType* invoke_op(const std::string& oper, const typeVec& args) {
+        if(oper== "=") {
+            return (_chclType*) NULL;
+        } else if((oper == "==") || (oper == "equal to")) {
+            _ret = new Bool(args[1] == NULL);
+            return _ret;
+        } else if ((oper == "!=") || (oper == "not equal to")) {
+            _ret = new Bool(args[1] != NULL);
+            return _ret;
+        } else {
+            return (_chclType*) NULL;
+        }
+    }
+};
+
+
+
 struct Int : _chclType {
+private:
     typedef union {
         int8_t _8b;
         int16_t _16b;
@@ -58,53 +194,194 @@ struct Int : _chclType {
     typedef union {
         signed_int si;
         usigned_int usi;
-    } uni_int;              //sizeof(uni_int) == 16 Worth it?
+    } uni_int;              //sizeof(uni_int) == 8 because sizeof(signed_int) == sizeof(usigned_int) Uni-int in 64 bits
 
+    _chclType* _ret = nullptr;
+public:
     uni_int val;
+    bool sign;
 
-    Int& operator =(const signed_int& i) {
-        if(i._64b > SCHAR_MAX) {
-            if(i._64b > SHRT_MAX) {
-                if(i._64b > INT_MAX) {
-                    if(i._64b > LLONG_MAX) {
-                        goto error;         //I've committed a sin, but I do not repent!
+    virtual operator std::string() const {
+        std::string toStr = "";
+        if(sign) {
+            toStr += val.si._64b;
+        } else {
+            toStr += val.usi._u64b;
+        }
+        return toStr;
+    }
+
+    virtual std::string type() const {
+        return "Int";
+    }
+
+    virtual bool operator==(const _chclType* other) {
+        if(other->type() == "Int") {
+            try {
+                const Int* temp = dynamic_cast<const Int*> (other);
+                if(temp->sign) {
+                    if(temp->val.si._64b == val.si._64b) {
+                        return true;
                     } else {
-                        val.si._64b = i._64b;
+                        return false;
                     }
                 } else {
-                    val.si._32b = i._32b;
+                    if(temp->val.usi._u64b == val.usi._u64b) {
+                        return true;
+                    } else {
+                        return false;
+                    }
                 }
-            } else {
-                val.si._16b = i._16b;
             }
-        } else if(i._64b < SCHAR_MIN){           //this tree could be bundled with the other to lessen the space
-            if(i._64b < SHRT_MIN) {              //but it's much clearer to read this way. If > SCHAR_MAX, if > SHRT_MAX...
-                if(i._64b < INT_MIN) {           //else if < SCHAR_MIN, if < SHRT_MIN...
-                    if(i._64b < LLONG_MIN) {
-                        goto error;         //I've done it again! Are you disgusted yet?
-                    } else {
-                        val.si._64b = i._64b;
-                    }
-                } else {
-                    val.si._32b = i._32b;
-                }
-            } else {
-                val.si._16b = i._16b;
+            catch (std::bad_cast ex)
+            {
+                return false;
             }
         } else {
-            val.si._8b = i._8b;
+            return false;
         }
-        goto _end;
+    }
 
-        error:      //this will probably never ever be reached unless there's some weird rule of C++ I don't understand
-            val.si._64b = 0;    //if something is wrong, the largest bit depth member gets set to the default value
-                                //I could give some debug output saying that the value is set to zero once I get the GUI
-                                //interpreter running.
-        _end:
-            return (Int&)(*this);    //operator chaining yay!
+    virtual bool operator!=(const _chclType* other) {
+        return !(*this == other);
+    }
+
+    Int() {
+        val.si._64b = 0;
+    }
+
+    //defining constructors for only int32_t, int64_t, uint32_t, and uint64_t
+
+    Int(const int32_t i) {
+        val.si._32b = i;
+    }
+
+    Int(int64_t i) {
+        val.si._64b = i;
+    }
+
+    Int(const uint32_t i) {
+        val.usi._u32b = i;
+    }
+
+    Int(uint64_t i) {
+        val.usi._u64b = i;
+    }
+
+    Int& operator=(const int32_t i) {
+        val.si._32b = i;
+        return (Int&)(*this);
+    }
+
+    Int& operator=(const int64_t i) {
+        val.si._64b = i;
+        return (Int&)(*this);
+    }
+
+    Int& operator=(const uint32_t i) {
+        val.usi._u32b = i;
+        return (Int&)(*this);
+    }
+
+    Int& operator=(const uint64_t i) {
+        val.usi._u64b = i;
+        return (Int&)(*this);
+    }
+
+    Int& operator=(const Int& I) {
+        *this = I;
+        return (Int&)(*this);
+    }
+
+    Int operator+(const int64_t& i) {        //addition with integer literals
+        if(i < 0) {
+            return (*this - (-i));
+        } else {
+            if((LLONG_MAX - val.si._64b) > i) {
+                Int temp(val.si._64b + i);
+                return temp;
+            } else {
+                Int temp(LLONG_MAX);
+                return temp;
+            }
+        }
+    }
+
+    Int operator+(const uint64_t& i) {
+        if((ULLONG_MAX - val.usi._u64b) > i) {
+            Int temp(val.usi._u64b + i);
+            return temp;
+        } else {
+            Int temp(ULLONG_MAX);
+            return temp;
+        }
+    }
+
+
+    Int operator-(const int64_t& i) {
+        if(i < 0) {
+            return (*this + (-i));
+        } else {
+            if( ((LLONG_MIN + std::abs(val.si._64b)) > (LLONG_MIN + i) )) {
+                Int temp = val.si._64b - i;
+                return temp;
+            } else {
+                Int temp(LLONG_MIN);
+                return temp;
+            }
+        }
+    }
+
+    Int operator-(const uint64_t& i) {
+        if((val.usi._u64b - i) > 0) {
+            Int temp(val.usi._u64b - i);
+            return temp;
+        } else {
+            Int temp(0);
+            return temp;
+        }
+    }
+
+    Int operator*(const int64_t& i) {
+        if((i < 0) != (val.si._64b < 0)) {
+            if(std::abs(LLONG_MIN / val.si._64b) > std::abs(i)) {
+                Int temp(val.si._64b * i);
+                return temp;
+            } else {
+                return Int(LLONG_MIN);
+            }
+        } else {
+            if((LLONG_MAX / val.si._64b) > i) {
+                Int temp(val.si._64b * i);
+                return temp;
+            } else {
+                return Int(LLONG_MAX);
+            }
+        }
+    }
+
+    Int operator*(const uint64_t& i) {
+        if((LLONG_MAX / val.usi._u64b) > i) {
+            Int temp(val.usi._u64b * i);
+            return temp;
+        } else {
+            return Int(LLONG_MAX);
+        }
+    }
+
+    Int operator/(const int64_t& i) {
+        return Int(val.si._64b / i);
+    }
+
+    Int operator/(const uint64_t& i) {
+        return Int(val.usi._u64b / i);
+    }
+
+    virtual _chclType* invoke_op(const std::string& oper, const typeVec& args) {
+
     }
 };
 
-typedef std::unordered_map<std::string, _chclType> VarTable;
+typedef std::unordered_map<std::string, _chclType*> VarTable;
 
 #endif // CHARCOALTYPES_H_INCLUDED
